@@ -16,6 +16,9 @@ public class test {
 		private int[] timestamps; // change to time?
 		private String filepath;
 		
+		private int movieofinterest;
+		private float actualrating;
+		
 		public userRatings(int usrid, String filepath) throws IOException {
 			this.usrid = usrid;
 			this.filepath = filepath;
@@ -45,6 +48,8 @@ public class test {
 				ratings[j] = Float.parseFloat(ratings1.get(j)[1]);
 			}
 			in.close();
+			movieofinterest = movies[0];
+			actualrating = ratings[0];
 		}
 		
 		// Print all rating data of this user.
@@ -72,6 +77,43 @@ public class test {
 			public float t2;
 		}
 		
+		private static class simildata {
+			public simildata(float simil, float avg, float rating) {
+				//super();
+				this.simil = simil;
+				this.avg = avg;
+				this.rating = rating;
+			}
+			public float simil;
+			public float avg;
+			public float rating;
+		}
+		
+		private simildata measure(ArrayList<corating> cors, ArrayList<Float> allratings) {
+			float avg = (float) 0.0;
+			for(float f: allratings) {
+				avg += f;
+			}
+			avg /= allratings.size();
+			float ra = 0;
+			
+			// Not a real similarity measure, change later.
+			float ra1 = (float) 0.0;
+			float ra2 = (float) 0.0;
+			for (int j = 0; j < cors.size(); j++) {
+				if (cors.get(j).mid == movieofinterest) {
+					ra = cors.get(j).r2;
+				} else {
+				ra1 += cors.get(j).r1;
+				ra2 += cors.get(j).r2;
+				}
+			}
+			ra1 /= (cors.size()-1);
+			ra2 /= (cors.size()-1);
+			
+			return new simildata((float) (5.0-Math.abs(ra1-ra2)), avg, ra);
+		}
+		
 		// A really simple similarity measure, only calculates differences in average ratings of two users and prints results.
 		// Of course later we will create a real similarity measure by slightly modifying the code.
 		public void simpleMeasure() throws IOException {
@@ -81,39 +123,37 @@ public class test {
 			int i=0;
 			int currentuser = 0;
 			ArrayList<corating> coratings = new ArrayList<>();
-			ArrayList<Float> similarity = new ArrayList<>();
+			ArrayList<simildata> similarity = new ArrayList<>();
+			ArrayList<Float> uratings = new ArrayList<>();
 			int start = 0;
+			boolean include = false;
 			for (CSVRecord record : records) {
 			    String column1 = record.get(0);
 			    if (i>0) {
 			    	int usr = Integer.parseInt(column1);
 			    	if (usr != usrid) {
 			    		if (usr != currentuser) {
-			    			// coratings includes all the common ratings of the two users. Modify this section to get a new measure.
-			    			if (coratings.size() == 0) {
-			    				similarity.add((float) 0.0);
+			    			// coratings includes all the common ratings of the two users.
+			    			if (!include || coratings.size() < 2) { // do nothing.
 			    			} else {
-			    				float ra1 = (float) 0.0;
-			    				float ra2 = (float) 0.0;
-			    				for (int j = 0; j < coratings.size(); j++) {
-			    					ra1 += coratings.get(j).r1;
-			    					ra2 += coratings.get(j).r2;
-			    				}
-			    				ra1 /= coratings.size();
-			    				ra2 /= coratings.size();
-			    				similarity.add((float) (5.0-Math.abs(ra1-ra2)));
+			    				similarity.add(measure(coratings, uratings));
 			    			}
 			    			// Initialize similarity data for next user.
 			    			currentuser = usr;
 			    			start = 0;
 			    			coratings = new ArrayList<>();
+			    			uratings = new ArrayList<>();
+			    			include = false;
 			    		} else {
 			    			// See if both users have seen same movie.
 			    			int mov = Integer.parseInt(record.get(1));
+			    			float r = Float.parseFloat(record.get(2));
+			    			uratings.add(r);
 			    			for (int j = start; j < movies.length; j++) {
 			    				int m = movies[j];
 			    				if (m==mov) { // If they have, add their ratings to coratings.
-			    					coratings.add(new corating(m, ratings[j], Float.parseFloat(record.get(2)), timestamps[j], Integer.parseInt(record.get(3))));
+			    					coratings.add(new corating(m, ratings[j], r, timestamps[j], Integer.parseInt(record.get(3))));
+			    					if (m==movieofinterest) {include = true;}
 			    				}
 			    				if (m > mov) {
 			    					start = j;
@@ -130,14 +170,17 @@ public class test {
 			for (int j=0; j<6; j++) {
 				sims[j] = 0;
 			}
-			for (float e: similarity) {
-				sims[Math.round(e)]++;
+			float prediction = 0;
+			for (simildata e: similarity) {
+				sims[Math.round(e.simil)]++;
+				prediction += e.rating;
 			}
+			prediction /= similarity.size();
 			// For each 0 <= j <= 5, print number of other users that have close to j in similarity.
 			for (int j=0; j<6; j++) {
 				System.out.println(j + " : " + sims[j]);
 			}
-		
+			System.out.println("Predicted: " + prediction + "   Actual: " + actualrating);
 		}
 	}
 
