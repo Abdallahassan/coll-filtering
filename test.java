@@ -2,6 +2,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.Collections;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
@@ -18,6 +19,7 @@ public class test {
 		
 		private int movieofinterest;
 		private float actualrating;
+		private float cavg;
 		
 		public userRatings(int usrid, String filepath) throws IOException {
 			this.usrid = usrid;
@@ -48,8 +50,19 @@ public class test {
 				ratings[j] = Float.parseFloat(ratings1.get(j)[1]);
 			}
 			in.close();
-			movieofinterest = movies[0];
-			actualrating = ratings[0];
+			changeto(0);
+		}
+		
+		private void changeto(int n) {
+			movieofinterest = movies[n];
+			actualrating = ratings[n];
+			cavg = (float) 0.0;
+			for (int j=0; j < ratings.length; j++) {
+				if (j != n) {
+					cavg += ratings[j];
+				}
+			}
+			cavg /= (ratings.length -1);
 		}
 		
 		// Print all rating data of this user.
@@ -77,7 +90,7 @@ public class test {
 			public float t2;
 		}
 		
-		private static class simildata {
+		private static class simildata implements Comparable<simildata> {
 			public simildata(float simil, float avg, float rating) {
 				//super();
 				this.simil = simil;
@@ -87,6 +100,11 @@ public class test {
 			public float simil;
 			public float avg;
 			public float rating;
+			
+			public int compareTo(simildata s) {
+				if (this.simil < s.simil) {return 1;} else if (this.simil == s.simil) {return 0;} else {return -1;}
+			}
+			
 		}
 		
 		private simildata measure(ArrayList<corating> cors, ArrayList<Float> allratings) {
@@ -100,6 +118,9 @@ public class test {
 			// Not a real similarity measure, change later.
 			float ra1 = (float) 0.0;
 			float ra2 = (float) 0.0;
+			
+			float ex1 = (float) 0.0;
+			
 			for (int j = 0; j < cors.size(); j++) {
 				if (cors.get(j).mid == movieofinterest) {
 					ra = cors.get(j).r2;
@@ -111,12 +132,21 @@ public class test {
 			ra1 /= (cors.size()-1);
 			ra2 /= (cors.size()-1);
 			
+			/*for (int j = 0; j < cors.size(); j++) {
+				if (cors.get(j).mid == movieofinterest) {
+					//
+				} else {
+					float a1 = (float) (cors.get(j).r1/ra1);
+					float a2 = (float) (cors.get(j).r2/ra2);
+				ex1 -= a1*(Math.log(a2)/Math.log(2.0));
+				}
+			}*/
 			return new simildata((float) (5.0-Math.abs(ra1-ra2)), avg, ra);
 		}
 		
 		// A really simple similarity measure, only calculates differences in average ratings of two users and prints results.
 		// Of course later we will create a real similarity measure by slightly modifying the code.
-		public void simpleMeasure() throws IOException {
+		private void measure() throws IOException {
 			
 			Reader in = new FileReader(filepath);
 			Iterable<CSVRecord> records = CSVFormat.RFC4180.parse(in);
@@ -166,21 +196,76 @@ public class test {
 			    i++;
 			}
 			in.close();
-			int[] sims = new int[6];
-			for (int j=0; j<6; j++) {
-				sims[j] = 0;
+			Collections.sort(similarity);
+			
+			float k = (float) 0.0;
+			float avg = (float) 0.0;
+			float weighted = (float) 0.0;
+			float normw = (float) 0.0;
+			simildata sd;
+			
+			float avgsimil = (float) 0.0;
+			System.out.println(movieofinterest);
+			
+			for (int j=0; j < 20; j++) {
+				sd = similarity.get(j);
+				avg += sd.rating;
+				weighted += sd.rating*sd.simil;
+				normw += (sd.rating-sd.avg)*sd.simil;
+				k += Math.abs(sd.simil);
+				avgsimil += sd.simil;
 			}
-			float prediction = 0;
-			for (simildata e: similarity) {
-				sims[Math.round(e.simil)]++;
-				prediction += e.rating;
+			System.out.println("First 20: avg = " + avg/20 + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/20);
+			
+			for (int j=20; j < 100; j++) {
+				sd = similarity.get(j);
+				avg += sd.rating;
+				weighted += sd.rating*sd.simil;
+				normw += (sd.rating-sd.avg)*sd.simil;
+				k += Math.abs(sd.simil);
+				avgsimil += sd.simil;
 			}
-			prediction /= similarity.size();
-			// For each 0 <= j <= 5, print number of other users that have close to j in similarity.
-			for (int j=0; j<6; j++) {
-				System.out.println(j + " : " + sims[j]);
+			System.out.println("First 100: avg = " + avg/100 + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/100);
+			
+			for (int j=100; j < 1000; j++) {
+				sd = similarity.get(j);
+				avg += sd.rating;
+				weighted += sd.rating*sd.simil;
+				normw += (sd.rating-sd.avg)*sd.simil;
+				k += Math.abs(sd.simil);
+				avgsimil += sd.simil;
 			}
-			System.out.println("Predicted: " + prediction + "   Actual: " + actualrating);
+			System.out.println("First 1000: avg = " + avg/1000 + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/1000);
+			
+			for (int j=1000; j < 2000; j++) {
+				sd = similarity.get(j);
+				avg += sd.rating;
+				weighted += sd.rating*sd.simil;
+				normw += (sd.rating-sd.avg)*sd.simil;
+				k += Math.abs(sd.simil);
+				avgsimil += sd.simil;
+			}
+			System.out.println("First 2000: avg = " + avg/2000 + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/5000);
+			
+			for (int j=2000; j < similarity.size(); j++) {
+				sd = similarity.get(j);
+				avg += sd.rating;
+				weighted += sd.rating*sd.simil;
+				normw += (sd.rating-sd.avg)*sd.simil;
+				k += Math.abs(sd.simil);
+				avgsimil += sd.simil;
+			}
+			System.out.println("All (" + similarity.size() + "): avg = " + avg/similarity.size() + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/similarity.size());
+			System.out.println("Actual = " + actualrating);
+			System.out.println();
+		}
+		
+		public void simulate() throws IOException {
+			measure();
+			for (int i=1; i < 8; i++) {
+				changeto(2*i);
+				measure();
+			}
 		}
 	}
 
@@ -188,7 +273,7 @@ public class test {
 		// User 1234 will be the reference in this test example.
 		userRatings urs = new userRatings(1234, "ml-20m/ratings.csv");
 		urs.prt();
-		urs.simpleMeasure();
+		urs.simulate();
 	}
 
 }
