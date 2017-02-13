@@ -1,3 +1,4 @@
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
@@ -20,6 +21,9 @@ public class test {
 		private int movieofinterest;
 		private float actualrating;
 		private float cavg;
+		private float[] averages;
+		private int[] numofratings;
+		private float mavg;
 		
 		public userRatings(int usrid, String filepath) throws IOException {
 			this.usrid = usrid;
@@ -44,13 +48,40 @@ public class test {
 			movies = new int[ratings1.size()];
 			timestamps = new int[ratings1.size()];
 			ratings = new float[ratings1.size()];
+			averages = new float[ratings1.size()];
+			numofratings = new int[ratings1.size()];
 			for (int j=0; j < ratings1.size(); j++) {
 				movies[j] = Integer.parseInt(ratings1.get(j)[0]);
 				timestamps[j] = Integer.parseInt(ratings1.get(j)[2]);
 				ratings[j] = Float.parseFloat(ratings1.get(j)[1]);
 			}
 			in.close();
+			fillAverages();
 			changeto(0);
+		}
+		
+		private void fillAverages() throws IOException {
+			Reader in = new FileReader(filepath);
+			Iterable<CSVRecord> records = CSVFormat.RFC4180.parse(in);
+			int i=0;
+			for (CSVRecord record : records) {
+			    String column = record.get(1);
+			    if (i>0) {
+			    	int mov = Integer.parseInt(column);
+			    	for (int j=0; j < movies.length; j++) {
+			    		if (mov==movies[j]) {
+			    			numofratings[j]++;
+			    			averages[j] += Float.parseFloat(record.get(2));
+			    			break;
+			    		}
+			    	}
+			    }
+			    i++;
+			}
+			for (int j=0; j < movies.length; j++) {
+				averages[j] /= numofratings[j];
+			}
+			in.close();
 		}
 		
 		private void changeto(int n) {
@@ -63,6 +94,7 @@ public class test {
 				}
 			}
 			cavg /= (ratings.length -1);
+			mavg = averages[n];
 		}
 		
 		// Print all rating data of this user.
@@ -91,15 +123,19 @@ public class test {
 		}
 		
 		private static class simildata implements Comparable<simildata> {
-			public simildata(float simil, float avg, float rating) {
+			public simildata(float simil, float avg, float rating, float ra1, float ra2) {
 				//super();
 				this.simil = simil;
 				this.avg = avg;
 				this.rating = rating;
+				this.ra1 = ra1;
+				this.ra2 = ra2;
 			}
 			public float simil;
 			public float avg;
 			public float rating;
+			public float ra1;
+			public float ra2;
 			
 			public int compareTo(simildata s) {
 				if (this.simil < s.simil) {return 1;} else if (this.simil == s.simil) {return 0;} else {return -1;}
@@ -118,9 +154,7 @@ public class test {
 			// Not a real similarity measure, change later.
 			float ra1 = (float) 0.0;
 			float ra2 = (float) 0.0;
-			
-			float ex1 = (float) 0.0;
-			
+						
 			for (int j = 0; j < cors.size(); j++) {
 				if (cors.get(j).mid == movieofinterest) {
 					ra = cors.get(j).r2;
@@ -141,7 +175,7 @@ public class test {
 				ex1 -= a1*(Math.log(a2)/Math.log(2.0));
 				}
 			}*/
-			return new simildata((float) (5.0-Math.abs(ra1-ra2)), avg, ra);
+			return new simildata((float) (5.0-Math.abs(ra1-ra2)), avg, ra, ra1, ra2);
 		}
 		
 		// A really simple similarity measure, only calculates differences in average ratings of two users and prints results.
@@ -203,60 +237,21 @@ public class test {
 			float weighted = (float) 0.0;
 			float normw = (float) 0.0;
 			simildata sd;
-			
 			float avgsimil = (float) 0.0;
 			System.out.println(movieofinterest);
-			
+			int step = Math.floorDiv(similarity.size(), 20);
 			for (int j=0; j < 20; j++) {
-				sd = similarity.get(j);
-				avg += sd.rating;
-				weighted += sd.rating*sd.simil;
-				normw += (sd.rating-sd.avg)*sd.simil;
-				k += Math.abs(sd.simil);
-				avgsimil += sd.simil;
+				for (int h = j*step; h < step*(j+1); h++) {
+					sd = similarity.get(h);
+					avg += sd.rating;
+					weighted += sd.rating*sd.simil;
+					normw += (sd.rating-sd.avg)*sd.simil;
+					k += Math.abs(sd.simil);
+					avgsimil += sd.simil;
+				}
+				System.out.println(j + "   avg = " + avg/(step*(j+1)) + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/(step*(j+1)));
 			}
-			System.out.println("First 20: avg = " + avg/20 + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/20);
-			
-			for (int j=20; j < 100; j++) {
-				sd = similarity.get(j);
-				avg += sd.rating;
-				weighted += sd.rating*sd.simil;
-				normw += (sd.rating-sd.avg)*sd.simil;
-				k += Math.abs(sd.simil);
-				avgsimil += sd.simil;
-			}
-			System.out.println("First 100: avg = " + avg/100 + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/100);
-			
-			for (int j=100; j < 1000; j++) {
-				sd = similarity.get(j);
-				avg += sd.rating;
-				weighted += sd.rating*sd.simil;
-				normw += (sd.rating-sd.avg)*sd.simil;
-				k += Math.abs(sd.simil);
-				avgsimil += sd.simil;
-			}
-			System.out.println("First 1000: avg = " + avg/1000 + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/1000);
-			
-			for (int j=1000; j < 2000; j++) {
-				sd = similarity.get(j);
-				avg += sd.rating;
-				weighted += sd.rating*sd.simil;
-				normw += (sd.rating-sd.avg)*sd.simil;
-				k += Math.abs(sd.simil);
-				avgsimil += sd.simil;
-			}
-			System.out.println("First 2000: avg = " + avg/2000 + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/5000);
-			
-			for (int j=2000; j < similarity.size(); j++) {
-				sd = similarity.get(j);
-				avg += sd.rating;
-				weighted += sd.rating*sd.simil;
-				normw += (sd.rating-sd.avg)*sd.simil;
-				k += Math.abs(sd.simil);
-				avgsimil += sd.simil;
-			}
-			System.out.println("All (" + similarity.size() + "): avg = " + avg/similarity.size() + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/similarity.size());
-			System.out.println("Actual = " + actualrating);
+			System.out.println("Actual = " + actualrating + "   Total avg = " + mavg + " Users = " + similarity.size());
 			System.out.println();
 		}
 		
