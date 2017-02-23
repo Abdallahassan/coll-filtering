@@ -1,6 +1,6 @@
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,7 +25,15 @@ public class test {
 		private int[] numofratings;
 		private float mavg;
 		
-		public userRatings(int usrid, String filepath) throws IOException {
+		PrintWriter wavg;
+	    PrintWriter wsum;
+	    PrintWriter nsum;
+		
+		public userRatings(int usrid, String filepath, PrintWriter wavg, PrintWriter wsum, PrintWriter nsum) throws IOException {
+			this.wavg = wavg;
+			this.wsum = wsum;
+			this.nsum = nsum;
+			
 			this.usrid = usrid;
 			this.filepath = filepath;
 			ArrayList<String[]> ratings1 = new ArrayList<>();
@@ -230,29 +238,42 @@ public class test {
 			    i++;
 			}
 			in.close();
-			Collections.sort(similarity);
-			
-			float k = (float) 0.0;
-			float avg = (float) 0.0;
-			float weighted = (float) 0.0;
-			float normw = (float) 0.0;
-			simildata sd;
-			float avgsimil = (float) 0.0;
-			System.out.println(movieofinterest);
-			int step = Math.floorDiv(similarity.size(), 20);
-			for (int j=0; j < 20; j++) {
-				for (int h = j*step; h < step*(j+1); h++) {
-					sd = similarity.get(h);
-					avg += sd.rating;
-					weighted += sd.rating*sd.simil;
-					normw += (sd.rating-sd.avg)*sd.simil;
-					k += Math.abs(sd.simil);
-					avgsimil += sd.simil;
+			if (similarity.size() > 99) {
+				Collections.sort(similarity);
+				
+				float k = (float) 0.0;
+				float avg = (float) 0.0;
+				float weighted = (float) 0.0;
+				float normw = (float) 0.0;
+				simildata sd;
+				float avgsimil = (float) 0.0;
+				System.out.println(movieofinterest);
+				int step = Math.floorDiv(similarity.size(), 20);
+				
+			    wavg.print(actualrating + " " + mavg + " " + similarity.size() + " ");
+			    wsum.print(actualrating + " " + mavg + " " + similarity.size() + " ");
+			    nsum.print(actualrating + " " + mavg + " " + similarity.size() + " ");
+				
+				for (int j=0; j < 20; j++) {
+					for (int h = j*step; h < step*(j+1); h++) {
+						sd = similarity.get(h);
+						avg += sd.rating;
+						weighted += sd.rating*sd.simil;
+						normw += (sd.rating-sd.avg)*sd.simil;
+						k += Math.abs(sd.simil);
+						avgsimil += sd.simil;
+					}
+					wavg.print(avg/(step*(j+1)) + " ");
+					wsum.print(weighted/k + " ");
+					nsum.print((cavg+(normw/k)) + " ");
+					System.out.println(j + "   avg = " + avg/(step*(j+1)) + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/(step*(j+1)));
 				}
-				System.out.println(j + "   avg = " + avg/(step*(j+1)) + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/(step*(j+1)));
-			}
-			System.out.println("Actual = " + actualrating + "   Total avg = " + mavg + " Users = " + similarity.size());
-			System.out.println();
+				System.out.println("Actual = " + actualrating + "   Total avg = " + mavg + " Users = " + similarity.size());
+				System.out.println();
+				wavg.println();
+				wsum.println();
+				nsum.println();
+			} else {System.out.println("Too little data");}
 		}
 		
 		public void simulate() throws IOException {
@@ -265,10 +286,17 @@ public class test {
 	}
 
 	public static void main(String[] args) throws IOException {
-		// User 1234 will be the reference in this test example.
-		userRatings urs = new userRatings(1234, "ml-20m/ratings.csv");
-		urs.prt();
-		urs.simulate();
+		PrintWriter wavg = new PrintWriter("avg.txt", "UTF-8");
+	    PrintWriter wsum = new PrintWriter("weightsum.txt", "UTF-8");
+	    PrintWriter nsum = new PrintWriter("normsum.txt", "UTF-8");
+		for (int i=0; i < 2; i++) {
+			userRatings urs = new userRatings(11000+(i*450), "ml-20m/ratings.csv", wavg, wsum, nsum);
+			urs.prt();
+			urs.simulate();
+		}
+		wavg.close();
+		wsum.close();
+		nsum.close();
 	}
 
 }
