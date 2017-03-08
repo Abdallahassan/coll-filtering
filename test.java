@@ -151,7 +151,11 @@ public class test {
 			
 		}
 		
-		private simildata measure(ArrayList<corating> cors, ArrayList<Float> allratings) {
+		private float scale(float f) {
+			return (float) (1.0/(1.0+(Math.exp(f))));
+		}
+		
+		private simildata measure(ArrayList<corating> cors, ArrayList<Float> allratings, int allmovies) {
 			float avg = (float) 0.0;
 			for(float f: allratings) {
 				avg += f;
@@ -162,28 +166,51 @@ public class test {
 			// Not a real similarity measure, change later.
 			float ra1 = (float) 0.0;
 			float ra2 = (float) 0.0;
-						
+			
+			/* 1
+			float a = 0;
+			float b = 0;
+			float c = 0;
+			*/
+			
+			float jacc = ((float) cors.size())/((float)allmovies);
+			float tot = 0;
+			float prox = 0;
+			float sign = 0;
+			float sing = 0;
+			float ecce = 0;
+			
 			for (int j = 0; j < cors.size(); j++) {
 				if (cors.get(j).mid == movieofinterest) {
 					ra = cors.get(j).r2;
 				} else {
-				ra1 += cors.get(j).r1;
-				ra2 += cors.get(j).r2;
+				corating cr = cors.get(j);
+				ra1 += cr.r1;
+				ra2 += cr.r2;
+				/* 1
+				a += (cr.r2 - avg)*(cr.r1 - cavg);
+				b += (cr.r1 - cavg)*(cr.r1 - cavg);
+				c += (cr.r2 - avg)*(cr.r2 - avg);
+				*/
+				prox = (float) (1.0-scale(-Math.abs(cr.r1-cr.r2)));
+				sign = (float) (scale((float) (-Math.abs(cr.r1-3.0)*Math.abs(cr.r2-3.0))));
+				sing = (float) (1.0-scale(-Math.abs( ( (cr.r1+cr.r2)/2) - mavg ) ));
+				ecce = (float) (1.0-scale(-Math.abs( (cr.r1-mavg)*(cr.r2-mavg) )));
+				tot += prox*sign*sing; // Add ecce later.
 				}
 			}
 			ra1 /= (cors.size()-1);
 			ra2 /= (cors.size()-1);
-			
-			/*for (int j = 0; j < cors.size(); j++) {
-				if (cors.get(j).mid == movieofinterest) {
-					//
-				} else {
-					float a1 = (float) (cors.get(j).r1/ra1);
-					float a2 = (float) (cors.get(j).r2/ra2);
-				ex1 -= a1*(Math.log(a2)/Math.log(2.0));
-				}
-			}*/
-			return new simildata((float) (5.0-Math.abs(ra1-ra2)), avg, ra, ra1, ra2);
+			float sim = 0;
+			/* 1
+			if (Math.sqrt(b*c) == 0) {
+				sim = (float) 1.0;
+			} else {
+				sim = (float) (a/((Math.sqrt(b*c))));
+			}
+			*/
+			sim = jacc*tot;
+			return new simildata(sim, avg, ra, ra1, ra2);
 		}
 		
 		// A really simple similarity measure, only calculates differences in average ratings of two users and prints results.
@@ -198,6 +225,7 @@ public class test {
 			ArrayList<simildata> similarity = new ArrayList<>();
 			ArrayList<Float> uratings = new ArrayList<>();
 			int start = 0;
+			int allmovies = 0;
 			boolean include = false;
 			for (CSVRecord record : records) {
 			    String column1 = record.get(0);
@@ -208,11 +236,12 @@ public class test {
 			    			// coratings includes all the common ratings of the two users.
 			    			if (!include || coratings.size() < 2) { // do nothing.
 			    			} else {
-			    				similarity.add(measure(coratings, uratings));
+			    				similarity.add(measure(coratings, uratings, allmovies+ratings.length-1));
 			    			}
 			    			// Initialize similarity data for next user.
 			    			currentuser = usr;
 			    			start = 0;
+			    			allmovies = 0;
 			    			coratings = new ArrayList<>();
 			    			uratings = new ArrayList<>();
 			    			include = false;
@@ -226,7 +255,7 @@ public class test {
 			    				if (m==mov) { // If they have, add their ratings to coratings.
 			    					coratings.add(new corating(m, ratings[j], r, timestamps[j], Integer.parseInt(record.get(3))));
 			    					if (m==movieofinterest) {include = true;}
-			    				}
+			    				} else {allmovies++;}
 			    				if (m > mov) {
 			    					start = j;
 			    					break;
@@ -254,19 +283,23 @@ public class test {
 			    wsum.print(actualrating + " " + mavg + " " + similarity.size() + " ");
 			    nsum.print(actualrating + " " + mavg + " " + similarity.size() + " ");
 				
+			    int count = 0;
 				for (int j=0; j < 20; j++) {
 					for (int h = j*step; h < step*(j+1); h++) {
 						sd = similarity.get(h);
-						avg += sd.rating;
-						weighted += sd.rating*sd.simil;
-						normw += (sd.rating-sd.avg)*sd.simil;
-						k += Math.abs(sd.simil);
-						avgsimil += sd.simil;
+						if (!Float.isNaN(sd.simil)) {
+							avg += sd.rating;
+							weighted += sd.rating*sd.simil;
+							normw += (sd.rating-sd.avg)*sd.simil;
+							k += Math.abs(sd.simil);
+							avgsimil += sd.simil;
+							count++;
+						}
 					}
-					wavg.print(avg/(step*(j+1)) + " ");
+					wavg.print(avg/(count) + " ");
 					wsum.print(weighted/k + " ");
 					nsum.print((cavg+(normw/k)) + " ");
-					System.out.println(j + "   avg = " + avg/(step*(j+1)) + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/(step*(j+1)));
+					System.out.println(j + "   avg = " + avg/(count) + "   weighted sum = " + weighted/k + "   normalised weighted = " + (cavg+(normw/k)) + "   average similarity = " + avgsimil/(count));
 				}
 				System.out.println("Actual = " + actualrating + "   Total avg = " + mavg + " Users = " + similarity.size());
 				System.out.println();
@@ -289,8 +322,8 @@ public class test {
 		PrintWriter wavg = new PrintWriter("avg.txt", "UTF-8");
 	    PrintWriter wsum = new PrintWriter("weightsum.txt", "UTF-8");
 	    PrintWriter nsum = new PrintWriter("normsum.txt", "UTF-8");
-		for (int i=0; i < 2; i++) {
-			userRatings urs = new userRatings(11000+(i*450), "ml-20m/ratings.csv", wavg, wsum, nsum);
+		for (int i=0; i < 100; i++) {
+			userRatings urs = new userRatings(11500+(i*520), "ml-20m/ratings.csv", wavg, wsum, nsum);
 			urs.prt();
 			urs.simulate();
 		}
